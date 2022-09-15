@@ -26,6 +26,8 @@ public class CodecInputSurface implements SurfaceTexture.OnFrameAvailableListene
     private boolean mFrameAvailable;
     private ByteBuffer mPixelBuf;
     private TextureRenderer mTextureRender;
+    private float intensity=0f;
+
     /**
      * Creates a CodecInputSurface from a Surface.
      */
@@ -124,7 +126,12 @@ public class CodecInputSurface implements SurfaceTexture.OnFrameAvailableListene
     }
 
     public void drawImage() {
-        mTextureRender.drawFrame(mSurfaceTexture);
+        mTextureRender.drawFrame(mSurfaceTexture,intensity);
+        if (intensity>=1f) {
+            intensity=1f;
+        }else {
+            intensity=intensity+0.01f;//Lins Log gradualy changing video filter
+        }
     }
 
     @Override

@@ -121,7 +121,7 @@ public class MainActivity extends AppCompatActivity {
                     tv_input.setText(before);
 
                     final String destPath = outputDir + File.separator + "VIDEOSIMMER_" + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()) + ".mp4";
-                    VideoSlimmer.convertVideo(inputPath, destPath, 200, 360, 200 * 360 * 30, new VideoSlimmer.ProgressListener() {
+                    VideoSlimmer.convertVideo(inputPath, destPath, 600, 400, 200 * 360 * 30, new VideoSlimmer.ProgressListener() {
                         @Override
                         public void onStart() {
 //                            tv_indicator.setText("Compressing..." + "\n"

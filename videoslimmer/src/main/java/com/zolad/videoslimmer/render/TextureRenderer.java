@@ -4,6 +4,7 @@ import android.graphics.SurfaceTexture;
 import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
 import android.opengl.Matrix;
+import android.util.Log;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -35,14 +36,53 @@ public class TextureRenderer {
             "  vTextureCoord = (uSTMatrix * aTextureCoord).xy;\n" +
             "}\n";
 
+
+
     private static final String FRAGMENT_SHADER =
             "#extension GL_OES_EGL_image_external : require\n" +
-            "precision mediump float;\n" +
-            "varying vec2 vTextureCoord;\n" +
-            "uniform samplerExternalOES sTexture;\n" +
-            "void main() {\n" +
-            "  gl_FragColor = texture2D(sTexture, vTextureCoord);\n" +
-            "}\n";
+            "precision lowp float;" +
+
+                    "varying highp vec2 vTextureCoord;" +
+                    "uniform samplerExternalOES sTexture;\n" +
+                    "uniform float intensity;" +
+
+                    "const mediump vec3 luminanceWeighting = vec3(0.2125, 0.7154, 0.0721);" +
+
+                    "void main() {" +
+
+                    "lowp vec4 textureColor = texture2D(sTexture, vTextureCoord);" +
+                    "float luminance = dot(textureColor.rgb, luminanceWeighting);" +
+
+                    "lowp vec4 desat = vec4(vec3(luminance), 1.0);" +
+
+                    "lowp vec4 outputColor = vec4(" +
+                    "(desat.r < 0.5 ? (2.0 * desat.r * 0.6) : (1.0 - 2.0 * (1.0 - desat.r) * (1.0 - 0.6)))," +
+                    "(desat.g < 0.5 ? (2.0 * desat.g * 0.45) : (1.0 - 2.0 * (1.0 - desat.g) * (1.0 - 0.45)))," +
+                    "(desat.b < 0.5 ? (2.0 * desat.b * 0.3) : (1.0 - 2.0 * (1.0 - desat.b) * (1.0 - 0.3)))," +
+                    "1.0" +
+                    ");" +
+
+                    "gl_FragColor = vec4(mix(textureColor.rgb, outputColor.rgb, intensity), textureColor.a);" +
+                    "}";
+
+//    private static final String FRAGMENT_SHADER = //grascale, linsTexture is the sample
+//            "#extension GL_OES_EGL_image_external : require\n" +
+//            "precision mediump float;" +
+//                    "varying vec2 vTextureCoord;" +
+//                    "uniform samplerExternalOES linsTexture;\n" +
+//                    "const highp vec3 weight = vec3(0.2125, 0.7154, 0.0721);" +
+//                    "void main() {" +
+//                    "float luminance = dot(texture2D(linsTexture, vTextureCoord).rgb, weight);" +
+//                    "gl_FragColor = vec4(vec3(luminance), 1.0);" +
+//                    "}";
+//    private static final String FRAGMENT_SHADER =
+//            "#extension GL_OES_EGL_image_external : require\n" +
+//            "precision mediump float;\n" +
+//            "varying vec2 vTextureCoord;\n" +
+//            "uniform samplerExternalOES sTexture;\n" +
+//            "void main() {\n" +
+//            "  gl_FragColor = texture2D(sTexture, vTextureCoord);\n" +
+//            "}\n";
 
     private float[] mMVPMatrix = new float[16];
     private float[] mSTMatrix = new float[16];
@@ -53,6 +93,8 @@ public class TextureRenderer {
     private int maPositionHandle;
     private int maTextureHandle;
     private int rotationAngle = 0;
+    private float intensity=0f;
+
 
     public TextureRenderer() {
 
@@ -65,7 +107,15 @@ public class TextureRenderer {
         return mTextureID;
     }
 
-    public void drawFrame(SurfaceTexture st) {
+    public void drawFrame(SurfaceTexture st, float intensity) {
+
+        try {
+            this.intensity=intensity;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+
         checkGlError("onDrawFrame start");
         st.getTransformMatrix(mSTMatrix);
 
@@ -83,12 +133,17 @@ public class TextureRenderer {
         checkGlError("glVertexAttribPointer maPosition");
         GLES20.glEnableVertexAttribArray(maPositionHandle);
         checkGlError("glEnableVertexAttribArray maPositionHandle");
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(mProgram, "intensity"), this.intensity);
+
+        checkGlError("glGetAttribLocation intensity");
+
         mTriangleVertices.position(TRIANGLE_VERTICES_DATA_UV_OFFSET);
         GLES20.glVertexAttribPointer(maTextureHandle, 2, GLES20.GL_FLOAT, false, TRIANGLE_VERTICES_DATA_STRIDE_BYTES, mTriangleVertices);
         checkGlError("glVertexAttribPointer maTextureHandle");
         GLES20.glEnableVertexAttribArray(maTextureHandle);
         checkGlError("glEnableVertexAttribArray maTextureHandle");
         GLES20.glUniformMatrix4fv(muSTMatrixHandle, 1, false, mSTMatrix, 0);
+
         GLES20.glUniformMatrix4fv(muMVPMatrixHandle, 1, false, mMVPMatrix, 0);
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
         checkGlError("glDrawArrays");
@@ -107,6 +162,8 @@ public class TextureRenderer {
         }
         maTextureHandle = GLES20.glGetAttribLocation(mProgram, "aTextureCoord");
         checkGlError("glGetAttribLocation aTextureCoord");
+
+
         if (maTextureHandle == -1) {
             throw new RuntimeException("Could not get attrib location for aTextureCoord");
         }
@@ -129,6 +186,7 @@ public class TextureRenderer {
         GLES20.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
         GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
         GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
+
         checkGlError("glTexParameter");
 
         Matrix.setIdentityM(mMVPMatrix, 0);
@@ -190,7 +248,9 @@ public class TextureRenderer {
     public void checkGlError(String op) {
         int error;
         if ((error = GLES20.glGetError()) != GLES20.GL_NO_ERROR) {
-            throw new RuntimeException(op + ": glError " + error);
+
+
+            throw new RuntimeException(op + ": LinsLog " + error);
         }
     }
 }
